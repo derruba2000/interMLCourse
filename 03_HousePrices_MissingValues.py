@@ -69,7 +69,7 @@ model.fit(final_X_train, y_train)
 
 # Get validation predictions and MAE
 preds_valid = model.predict(final_X_valid)
-print("MAE (Your appraoch):")
+print("MAE (Your approach):")
 print(mean_absolute_error(y_valid, preds_valid))
 
 # Imputation
@@ -80,11 +80,8 @@ final_X_test = pd.DataFrame(final_imputer.fit_transform(X_test))
 
 # Fill in the line below: get test predictions
 preds_test = model.predict(final_X_test)
-
-
 # Preprocess test data
 final_X_test = pd.DataFrame(final_imputer.transform(X_test))
-
 # Get test predictions
 preds_test = model.predict(final_X_test)
 
