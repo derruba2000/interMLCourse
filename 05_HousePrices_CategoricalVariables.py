@@ -28,7 +28,7 @@ X.drop(['SalePrice'], axis=1, inplace=True)
 # To keep things simple, we'll drop columns with missing values
 cols_with_missing = [col for col in X.columns if X[col].isnull().any()] 
 X.drop(cols_with_missing, axis=1, inplace=True)
-X_test.drop(cols_with_missing, axis=1, inplace=True)
+#X_test.drop(cols_with_missing, axis=1, inplace=True)
 
 # Break off validation set from training data
 X_train, X_valid, y_train, y_valid = train_test_split(X, y,
@@ -55,12 +55,24 @@ object_cols = [col for col in X_train.columns if X_train[col].dtype == "object"]
 # Columns that can be safely label encoded
 good_label_cols = [col for col in object_cols if 
                    set(X_train[col]) == set(X_valid[col])]
+
+same_test_cols=[col for col in object_cols if 
+                   set(X_train[col]) == set(X_test[col])]
         
 # Problematic columns that will be dropped from the dataset
 bad_label_cols = list(set(object_cols)-set(good_label_cols))
+
+bad_testlabel_cols = list(set(object_cols)-set(same_test_cols))
+
+total_bad_label_cols=list((set(same_test_cols)| set(good_label_cols)))
+
         
 print('Categorical columns that will be label encoded:', good_label_cols)
 print('\nCategorical columns that will be dropped from the dataset:', bad_label_cols)
+print('\nCategorical columns that will be dropped from the test dataset:', same_test_cols)
+print('\nCategorical columns that will be dropped from the total dataset:', total_bad_label_cols)
+
+
 
 # Drop categorical columns that will not be encoded
 label_X_train = X_train.drop(bad_label_cols, axis=1)
@@ -135,39 +147,52 @@ print(mean_absolute_error(y_valid, preds_valid))
 # Imputation
 
 
-print("--->",X_test.info(verbose=True))
+print("1----->",X_test.info(verbose=True))
 
 
 X_test_nonobj = X_test.select_dtypes(exclude=['object'])
+#print("2----->", X_test_nonobj.head())
+
 testobj_cols = list(set(X_test.columns)-set(X_test_nonobj.columns))
-
-print("3----->",testobj_cols)
-
+#print("3----->",testobj_cols)
 X_test_obj=X_test[testobj_cols]
 
-print("4--->", X_test_obj.shape)
+
 
 final_imputer = SimpleImputer(strategy='median')
 tmp_X_test = pd.DataFrame(final_imputer.fit_transform(X_test_nonobj))
+tmp_X_test.columns=X_test_nonobj.columns
+tmp_X_test.index=X_test.index
+#print("3b----->",tmp_X_test.head())
 
 
 # OH
-# Number of missing values in each column of training data
+# Number of missing values in each column of testing data
 missing_val_count_by_column = (X_test_obj.isnull().sum())
-print("--->", missing_val_count_by_column[missing_val_count_by_column > 0])
-print(X_test_obj.head())
-
+print("4------>", missing_val_count_by_column[missing_val_count_by_column > 0])
 X_test_obj=X_test_obj.fillna("NA")
+#print("4b------>",X_test_obj.head())
 
 OH_cols_test = pd.DataFrame(OH_encoder.fit_transform(X_test_obj[low_cardinality_cols]))
 OH_cols_test.index = X_test.index
-OH_cols_test2=[tmp_X_test, OH_cols_test]
+#print("6b------>",OH_cols_test.head())
+
+
+
+
 #num_X_test = OH_cols_test2.drop(object_cols, axis=1)
-OH_X_test = pd.concat([ OH_cols_test2], axis=1)
+OH_X_test = pd.concat( [tmp_X_test, OH_cols_test], axis=1)
+print("6c------>",OH_X_test.info(verbose=True))
+print("6d------>", object_cols)
 
-print("--->",OH_X_test.info(verbose=True))
+#['GarageYrBlt', 'MasVnrArea', 'LotFrontage']
+label_OH_X_test = OH_X_test.drop(['GarageYrBlt', 'MasVnrArea', 'LotFrontage'], axis=1)
 
-preds_test = model.predict(OH_X_test)
+model = RandomForestRegressor(n_estimators=100, random_state=0)
+model.fit(OH_X_train[label_OH_X_test.columns], y_train)
+
+
+preds_test = model.predict(label_OH_X_test)
 
 output = pd.DataFrame({'Id': X_test.index,
                        'SalePrice': preds_test})
